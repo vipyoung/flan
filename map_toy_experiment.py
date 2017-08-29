@@ -13,7 +13,7 @@ import datetime as dt
 import sys
 from plot_experiment_results import plot_toy_experiment_results
 import utilities as util
-
+from scipy.sparse import find
 
 def cross_validate_params(method, n_input_graphs, n_entities,
 						  n_input_graph_nodes, p_keep_edge, density_multiplier,
@@ -416,15 +416,7 @@ if __name__ == "__main__":
 	traj_path = '/home/sofiane/projects/data/GPS_Dataprivatebus_trips_20s_sample/'
 	data_path = 'tmp_data/'
 	n_traj = 10
-
-	sGs, actual_bbox = generate_trajectory_graphs_v1(trajectories_path=traj_path, n_subgraphs=n_traj)
-	print 'Sofiane: There are %s subgraphs.' % len(sGs)
-	print 'Sofiane: Saving graphs into files'
-	util.save_sgs_into_edge_file(sGs, path=data_path)
-	print 'Sofiane: Computing similarities 1/(1+dist)'
-	similarity_tuples = util.compute_map_similarity_tuples_v1(sGs=sGs, path=data_path)
-	print 'Sofiane: Similarities saved into a file'
-
+	matching_threshold = 50 # in meters
 	f = 0.2
 	g = 0.5
 	gap_cost = f
@@ -435,6 +427,16 @@ if __name__ == "__main__":
 	#method = 'upProgmKlau'
 	#method = 'progmKlau'
 	seed = np.random.randint(0, 1000000)
+
+ 	sGs, actual_bbox = generate_trajectory_graphs_v1(trajectories_path=traj_path, n_subgraphs=n_traj)
+	print 'Sofiane: There are %s subgraphs.' % len(sGs)
+	print 'Sofiane: Saving graphs into files'
+	util.save_sgs_into_edge_file(sGs, path=data_path)
+	print 'Sofiane: Computing similarities 1/(1+dist)'
+	similarity_tuples = util.compute_map_similarity_tuples_v1(sGs=sGs, path=data_path, threshold=matching_threshold)
+	print 'Sofiane: Similarities saved into a file'
+
+
 
 	if seed is not None:
 		print "Used seed:", seed
@@ -448,18 +450,27 @@ if __name__ == "__main__":
 	max_iters = 300
 	max_algorithm_iterations = mai
 	max_entities = None
-	shuffle = True
+	shuffle = False
 	title='f0.2'
-	do_save = True
+	do_save = False
 	do_plot = True
 	trajectories_path = traj_path
 
-	x, other = align_multiple_map_networks(
-		sGs, cost_params, similarity_tuples=similarity_tuples, method=method, max_iters=max_iters,
-		max_algorithm_iterations=max_algorithm_iterations,
-		max_entities=max_entities, shuffle=shuffle,
-	)
+	x, other = align_multiple_map_networks(sGs, cost_params, similarity_tuples=similarity_tuples, method=method,
+	                                       max_iters=max_iters, max_algorithm_iterations=max_algorithm_iterations,
+	                                       max_entities=max_entities, shuffle=shuffle)
+
 	print "Optimization took {:.2f} seconds.".format(time.time() - t0)
+	print 'Sofiane: this the famous x:', x
+	print 'Sofiane: others:', other
+	print 'sofiane, nb elements in graph', other['G'].number_of_nodes(), other['G'].number_of_edges()
+	print 'sofiane, Saving B matrix'
+	lfp_rn = util.create_result_graph(other, sGs, fname=data_path + 'res.txt')
+	util.draw_graph(lfp_rn, bbox=actual_bbox, showNodes=True)
+	util.draw_union_subgraphs(sGs, bbox=actual_bbox, showNodes=True)
+	plt.show()
+
+
 
 	#
 	# pr, re, f1, o1 = single_cer_map(
@@ -476,6 +487,7 @@ if __name__ == "__main__":
 		plt.plot(other['Zd_scores'], '-x')
 		plt.plot(other['feasible_scores'], '-o')
 		plt.show()
+
 
 	#test_single(f=0.2, do_plot=True, do_save=True, title="f0.2")
 

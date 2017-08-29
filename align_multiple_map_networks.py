@@ -44,7 +44,7 @@ def align_multiple_map_networks(Gs, cost_params, similarity_tuples=None,
         matched indices for each object
         score
     """
-    A, B, similarities, GG, groundtruth, graph2nodes, old2new_label = \
+    A, B, similarities, GG, groundtruth, graph2nodes, old2new_label, node2index = \
         construct_A_and_sims(Gs, similarity_tuples, graph_alignment_order=
                              range(len(Gs)), shuffle_node_labels=shuffle)
     n = A.shape[0]
@@ -61,6 +61,7 @@ def align_multiple_map_networks(Gs, cost_params, similarity_tuples=None,
         n_xij += len(cms)
     print "Total number of xij's:", n_xij
     asg = Assignment(n, matches, candidate_matches)
+    print 'sofiane: Assignment:', asg
     print "Constructing Kronecker product of size %d x %d..." % (asg.xlen,
                                                                  asg.xlen)
     t0 = time.time()
@@ -159,6 +160,7 @@ def align_multiple_map_networks(Gs, cost_params, similarity_tuples=None,
     other['G'] = GG
     other['graph2nodes'] = graph2nodes
     other['n_clusters'] = len(asg.get_clusters())
+    other['node2index'] = node2index
     return x, other
 
 
@@ -200,6 +202,7 @@ def construct_A_and_sims(Gs, similarity_tuples=None, graph_alignment_order=None,
     old2new_label = None
     if shuffle_node_labels:
         # Shuffle node labels just in case
+        print 'Sofiane: Shuffling is still happening..........................................!'
         renamed_labels = np.random.permutation(len(fullG))
         old2new_label = {i: renamed_labels[i] for i in fullG.nodes()}
         fullG = nx.relabel_nodes(
@@ -261,8 +264,8 @@ def construct_A_and_sims(Gs, similarity_tuples=None, graph_alignment_order=None,
             if graph_alignment_order is not None:
                 gi_idx = graph_alignment_order.index(g1)
                 gj_idx = graph_alignment_order.index(g2)
-                order_ok = gi_idx >= gj_idx
-                # order_ok = gi_idx <= gj_idx
+                # order_ok = gi_idx >= gj_idx
+                order_ok = gi_idx <= gj_idx
             if order_ok:
                 sims[v1][v2] = sim
 
@@ -276,7 +279,7 @@ def construct_A_and_sims(Gs, similarity_tuples=None, graph_alignment_order=None,
         for i in fullG.nodes():
             gts.append(i)
         print "Groundtruth constructed ({:.2f} seconds).".format(time.time()-t0)
-    return A, B, sims, fullG, gts, graph2nodes, old2new_label
+    return A, B, sims, fullG, gts, graph2nodes, old2new_label, node2idx
 
 
 def deshuffle(old2new_label, x, G, graph2nodes, prev_xs=None):

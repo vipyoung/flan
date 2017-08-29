@@ -58,6 +58,7 @@ def LD_algorithm(P, max_iterations=500, max_alg_iterations=1, binary_B=False,
                 print "\nx didn't change, stopping algorithm iteration."
                 break
     res['prev_xs'] = prev_xs
+    res['B'] = P.B
     return res
 
 

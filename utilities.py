@@ -8,8 +8,10 @@ import os
 import cPickle as pickle
 import geopy
 import geopy.distance
-
-
+from scipy.sparse import find
+import networkx as nx
+from matplotlib import pyplot as plt
+from matplotlib import collections as mc
 
 def geo_distance(pt1, pt2):
 	"""
@@ -21,6 +23,131 @@ def geo_distance(pt1, pt2):
 	startpoint = geopy.Point([pt1[1], pt1[0]])
 	endpoint = geopy.Point([pt2[1], pt2[0]])
 	return geopy.distance.distance(startpoint, endpoint).meters
+
+
+def save_B(B, fname=None):
+	if fname is None:
+		return None
+
+	I, J, V = find(B)
+	with open(fname, 'w') as g:
+		for i in range(len(I)):
+			g.write('%s %s %s\n' % (I[i], J[i], V[i]))
+
+
+def create_result_graph(other, sGs, fname=None):
+
+	rn = nx.DiGraph()
+	node2coordinates = {}
+	for idx, sg in enumerate(sGs):
+		for node in sg.nodes():
+			node2coordinates[(idx, node)] = sg.node[node]['coordinates']
+
+	node2index = other['node2index']
+
+	overallnode2localnode = {}
+	for (sg_index, localnode), overallnode in node2index.iteritems():
+		overallnode2localnode[overallnode] = (sg_index, localnode)
+
+	I, J, V = find(other['B'])
+
+	for i in range(len(I)):
+		o_s_n = I[i]
+		o_t_n = J[i]
+		v = V[i]
+		s_n_coor = node2coordinates[overallnode2localnode[o_s_n]]
+		t_n_coor = node2coordinates[overallnode2localnode[o_t_n]]
+		rn.add_edge(s_n_coor, t_n_coor)
+
+	if fname is not None:
+		with open(fname, 'w') as g:
+			for s_n_coor, t_n_coor in rn.edges():
+				g.write('%s %s %s %s\n' % (s_n_coor[0], s_n_coor[1], t_n_coor[0], t_n_coor[1]))
+	return rn
+
+#
+# def save_result_graph(other, sGs, fname=None):
+# 	if fname is None:
+# 		return None
+#
+# 	node2coordinates = {}
+# 	for idx, sg in enumerate(sGs):
+# 		for node in sg.nodes():
+# 			node2coordinates[(idx, node)] = sg.node[node]['coordinates']
+#
+# 	node2index = other['node2index']
+#
+# 	overallnode2localnode = {}
+# 	for (sg_index, localnode), overallnode in node2index.iteritems():
+# 		overallnode2localnode[overallnode] = (sg_index, localnode)
+#
+# 	I, J, V = find(other['B'])
+# 	with open(fname, 'w') as g:
+# 		for i in range(len(I)):
+# 			o_s_n = I[i]
+# 			o_t_n = J[i]
+# 			v = V[i]
+# 			s_n_coor = node2coordinates[overallnode2localnode[o_s_n]]
+# 			t_n_coor = node2coordinates[overallnode2localnode[o_t_n]]
+# 			g.write('%s %s %s %s\n' % (s_n_coor[0], s_n_coor[1], t_n_coor[0], t_n_coor[1]))
+
+
+def draw_subgraphs(SGs, bbox, showNodes=False):
+	fig, ax = plt.subplots(nrows=len(SGs)/3+1, ncols=3, figsize=(30, 40))
+
+	union_lines = []
+	for i, G in enumerate(SGs):
+		lines = [[s, t] for s, t in G.edges()]
+		union_lines += lines
+		lc = mc.LineCollection(lines, colors='black', linewidths=1)
+		ax1 = plt.subplot(len(SGs)/3+1, 3, i+1)
+		ax1.add_collection(lc)
+		ax1.autoscale()
+		ax1.set_xlim(bbox[1], bbox[0])
+		ax1.set_ylim(bbox[3], bbox[2])
+		if showNodes == True:
+			plt.scatter([node[0] for node in G.nodes()], [node[1] for node in G.nodes()], s=10)
+
+	# Print Union of all subgraphs:
+	lc = mc.LineCollection(union_lines, colors='red', linewidths=2)
+	ax1 = plt.subplot(len(SGs) / 3 + 1, 3, len(SGs) + 1)
+	ax1.add_collection(lc)
+	ax1.autoscale()
+	ax1.set_xlim(bbox[1], bbox[0])
+	ax1.set_ylim(bbox[3], bbox[2])
+	if showNodes == True:
+		plt.scatter([node[0] for G in SGs for node in G.nodes()], [node[1] for G in SGs for node in G.nodes()], s=10)
+	plt.show()
+
+
+def draw_union_subgraphs(SGs, bbox, showNodes=False):
+	fullG = nx.DiGraph()
+	for graph_idx, inputG in enumerate(SGs):
+		fullG = nx.disjoint_union(fullG, inputG)
+
+	fig, ax = plt.subplots()
+
+	lines = [[fullG.node[s]['coordinates'], fullG.node[t]['coordinates']] for s, t in fullG.edges()]
+	lc = mc.LineCollection(lines, colors='black', linewidths=1)
+	ax.add_collection(lc)
+	ax.autoscale()
+	ax.set_xlim(bbox[1], bbox[0])
+	ax.set_ylim(bbox[3], bbox[2])
+	if showNodes == True:
+		plt.scatter([fullG.node[node]['coordinates'][0] for node in fullG.nodes()], [fullG.node[node]['coordinates'][1] for node in fullG.nodes()], s=10)
+
+
+
+def draw_graph(G, bbox, showNodes=False):
+	fig, ax = plt.subplots()
+	lines = [[s, t] for s, t in G.edges()]
+	lc = mc.LineCollection(lines, colors='black', linewidths=1)
+	ax.add_collection(lc)
+	ax.autoscale()
+	ax.set_xlim(bbox[1], bbox[0])
+	ax.set_ylim(bbox[3], bbox[2])
+	if showNodes == True:
+		plt.scatter([node[0] for node in G.nodes()], [node[1] for node in G.nodes()], s=10)
 
 
 def compute_map_similarity_tuples(sGs, save=True, path=None):
@@ -51,7 +178,7 @@ def compute_map_similarity_tuples(sGs, save=True, path=None):
 			fsim.write('%s %s %s %s %s' % sim_tuple)
 	return similarity_tuples
 
-def compute_map_similarity_tuples_v1(sGs, path=None):
+def compute_map_similarity_tuples_v1(sGs, path=None, threshold=50):
 	"""
 	SOfiane: created this method to compute list of tuple similarities in the format:
 										(graph1_index, node1, graph2_index, node2, similarity)
@@ -64,8 +191,12 @@ def compute_map_similarity_tuples_v1(sGs, path=None):
 	for i, g1 in enumerate(sGs):
 		for g2 in sGs[i+1:]:
 			for node1 in g1.nodes():
+				# Add identity simiarity
+				similarity_tuples.append((g1.node[node1]['subgraph'], node1, g1.node[node1]['subgraph'], node1, 1))
 				for node2 in g2.nodes():
 					dist = geo_distance(g1.node[node1]['coordinates'], g2.node[node2]['coordinates'])
+					if dist > 50:
+						continue
 					sim = 1 / float(1 + dist)
 					similarity_tuples.append((g1.node[node1]['subgraph'], node1, g2.node[node2]['subgraph'], node2,
 					                          sim))
