@@ -2,7 +2,7 @@
 Run this file to conduct the experiment on aligning synthetic graphs.
 """
 from generate_toy_data import generate_graphs
-from generate_map_data import generate_trajectory_graphs
+from generate_map_data import generate_trajectory_graphs, generate_trajectory_graphs_v1
 from align_multiple_networks import align_multiple_networks
 from align_multiple_map_networks import align_multiple_map_networks
 import numpy as np
@@ -414,7 +414,69 @@ def test_single_map(f=None, do_plot=False, do_save=False, title="", trajectories
 
 if __name__ == "__main__":
 	traj_path = '/home/sofiane/projects/data/GPS_Dataprivatebus_trips_20s_sample/'
-	test_single_map(f=0.2, do_plot=True, do_save=True, title='f0.2', trajectories_path=traj_path)
+	data_path = 'tmp_data/'
+	n_traj = 10
+
+	sGs, actual_bbox = generate_trajectory_graphs_v1(trajectories_path=traj_path, n_subgraphs=n_traj)
+	print 'Sofiane: There are %s subgraphs.' % len(sGs)
+	print 'Sofiane: Saving graphs into files'
+	util.save_sgs_into_edge_file(sGs, path=data_path)
+	print 'Sofiane: Computing similarities 1/(1+dist)'
+	similarity_tuples = util.compute_map_similarity_tuples_v1(sGs=sGs, path=data_path)
+	print 'Sofiane: Similarities saved into a file'
+
+	f = 0.2
+	g = 0.5
+	gap_cost = f
+	mai = 1
+	method = 'binB-LD'
+	method = 'LD'
+	#method = 'mKlau'
+	#method = 'upProgmKlau'
+	#method = 'progmKlau'
+	seed = np.random.randint(0, 1000000)
+
+	if seed is not None:
+		print "Used seed:", seed
+		random.seed(seed)
+		np.random.seed(seed)
+	# sGs, G = generate_graphs(n_entities, n_input_graphs, n_input_graph_nodes,
+	#                          p_keep_edge, density_multiplier, n_duplicates)
+
+	t0 = time.time()
+	cost_params = {'f': f, 'g': g, 'gap_cost': gap_cost}
+	max_iters = 300
+	max_algorithm_iterations = mai
+	max_entities = None
+	shuffle = True
+	title='f0.2'
+	do_save = True
+	do_plot = True
+	trajectories_path = traj_path
+
+	x, other = align_multiple_map_networks(
+		sGs, cost_params, similarity_tuples=similarity_tuples, method=method, max_iters=max_iters,
+		max_algorithm_iterations=max_algorithm_iterations,
+		max_entities=max_entities, shuffle=shuffle,
+	)
+	print "Optimization took {:.2f} seconds.".format(time.time() - t0)
+
+	#
+	# pr, re, f1, o1 = single_cer_map(
+	# 	f, g=g, gap_cost=gap_cost, seed=seed, method=method,
+	# 	n_input_graphs=10, n_duplicates=3, p_keep_edge=0.8,
+	# 	density_multiplier=1.1, n_entities=100, n_input_graph_nodes=30,
+	# 	max_iters=300, max_algorithm_iterations=mai, shuffle=True,
+	# 	max_entities=max_entities, trajectories_path=trajectories_path)
+
+	if do_save:
+		util.save_data(locals(), "single_synthetic_" + title)
+
+	if do_plot:
+		plt.plot(other['Zd_scores'], '-x')
+		plt.plot(other['feasible_scores'], '-o')
+		plt.show()
+
 	#test_single(f=0.2, do_plot=True, do_save=True, title="f0.2")
 
 	# test_single(f=1.2, do_plot=True, do_save=True, title="f1.2")

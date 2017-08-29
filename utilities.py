@@ -23,7 +23,7 @@ def geo_distance(pt1, pt2):
 	return geopy.distance.distance(startpoint, endpoint).meters
 
 
-def compute_map_similarity_tuples(sGs):
+def compute_map_similarity_tuples(sGs, save=True, path=None):
 	"""
 	SOfiane: created this method to compute list of tuple similarities in the format:
 										(graph1_index, node1, graph2_index, node2, similarity)
@@ -31,20 +31,68 @@ def compute_map_similarity_tuples(sGs):
 	:return:
 	"""
 
-
+	sims = []
 	similarity_tuples = []
 	for i, g1 in enumerate(sGs):
 		for g2 in sGs[i+1:]:
 			for node1 in g1.nodes():
 				for node2 in g2.nodes():
 					dist = geo_distance(node1, node2)
+					sim = 1 / float(1 + dist)
 					similarity_tuples.append((g1.node[node1]['subgraph'], node1, g2.node[node2]['subgraph'], node2,
 					                          dist))
 					similarity_tuples.append((g2.node[node2]['subgraph'], node2, g1.node[node1]['subgraph'], node1,
 					                          dist))
-					print (g1.node[node1]['subgraph'], node1, g2.node[node2]['subgraph'], node2,
-					                          geo_distance(node1, node2))
+					sims.append(dist)
+	print 'Sofiane: median distance is:', sorted(sims)[len(sims)/2]
+	assert (save and not path), "Cannot save the similarity tuples, no path is provided."
+	with open(path + 'similarity_tuples.txt', 'w') as fsim:
+		for sim_tuple in similarity_tuples:
+			fsim.write('%s %s %s %s %s' % sim_tuple)
 	return similarity_tuples
+
+def compute_map_similarity_tuples_v1(sGs, path=None):
+	"""
+	SOfiane: created this method to compute list of tuple similarities in the format:
+										(graph1_index, node1, graph2_index, node2, similarity)
+	:param sGs:
+	:return:
+	"""
+
+	sims = []
+	similarity_tuples = []
+	for i, g1 in enumerate(sGs):
+		for g2 in sGs[i+1:]:
+			for node1 in g1.nodes():
+				for node2 in g2.nodes():
+					dist = geo_distance(g1.node[node1]['coordinates'], g2.node[node2]['coordinates'])
+					sim = 1 / float(1 + dist)
+					similarity_tuples.append((g1.node[node1]['subgraph'], node1, g2.node[node2]['subgraph'], node2,
+					                          sim))
+					similarity_tuples.append((g2.node[node2]['subgraph'], node2, g1.node[node1]['subgraph'], node1,
+					                          sim))
+					sims.append(dist)
+	print 'Sofiane: median distance is:', sorted(sims)[len(sims)/2]
+	assert path is not None, "Cannot save the similarity tuples, no path is provided."
+	with open(path + 'similarity_tuples.txt', 'w') as fsim:
+		for sim_tuple in similarity_tuples:
+			fsim.write('%s %s %s %s %s\n' % sim_tuple)
+	return similarity_tuples
+
+def save_sgs_into_edge_file(sgs, path):
+	"""
+	Sofiane: this is to prepare graphs in the format Eric suggested for his command line code.
+	:param sgs:
+	:param fname:
+	:return:
+	"""
+	with open(path+'edges.txt', 'w') as fedges,  open(path + 'nodes.txt', 'w') as fnodes:
+		for i, sg in enumerate(sgs):
+			for s, t in sg.edges():
+				fedges.write('%s %s %s 1\n' % (i, s, t))
+			for node in sg.nodes():
+				fnodes.write('%s %s %s %s\n' % (i, node, sg.node[node]['coordinates'][0], sg.node[node]['coordinates'][1]))
+
 
 
 def save_data(data, title='saved_data', date=None):

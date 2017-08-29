@@ -74,6 +74,7 @@ def align_multiple_map_networks(Gs, cost_params, similarity_tuples=None,
     f = cost_params['f']
     g = cost_params['g']
     gap_cost = cost_params.get('gap_cost', None)
+    print 'Initializing the problem P'
     P = variables.Problem(f, D, g, gap_cost, n, A, candidate_matches,
                           graph2nodes, B=B, self_discount=self_discount,
                           max_entities=max_entities)
@@ -203,8 +204,7 @@ def construct_A_and_sims(Gs, similarity_tuples=None, graph_alignment_order=None,
         old2new_label = {i: renamed_labels[i] for i in fullG.nodes()}
         fullG = nx.relabel_nodes(
             fullG, old2new_label, copy=True)
-        node2graph = {renamed_labels[i]: graph for i, graph in
-                      node2graph.iteritems()}
+        node2graph = {renamed_labels[i]: graph for i, graph in node2graph.iteritems()}
         for graph, nodes in graph2nodes.iteritems():
             graph2nodes[graph] = [renamed_labels[i] for i in nodes]
         for key, old_idx in node2idx.iteritems():
@@ -262,8 +262,10 @@ def construct_A_and_sims(Gs, similarity_tuples=None, graph_alignment_order=None,
                 gi_idx = graph_alignment_order.index(g1)
                 gj_idx = graph_alignment_order.index(g2)
                 order_ok = gi_idx >= gj_idx
+                # order_ok = gi_idx <= gj_idx
             if order_ok:
                 sims[v1][v2] = sim
+
         for i in range(len(fullG)):
             if len(sims[i]) == 0:
                 # Each node should have at least one candidate match

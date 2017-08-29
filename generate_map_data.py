@@ -20,6 +20,7 @@ def generate_trajectory_graphs(trajectories_path, n_subgraphs, bbox=None):
 	max_lon, min_lon, max_lat, min_lat = float("-inf"), float("inf"), float("-inf"), float("inf")
 	SGs = []
 	for sg_idx, fname in enumerate(os.listdir(trajectories_path)[:n_subgraphs]):
+		print fname
 		with open(os.path.join(trajectories_path, fname)) as f:
 			edge_lst = []
 			lines = f.readlines()
@@ -38,6 +39,69 @@ def generate_trajectory_graphs(trajectories_path, n_subgraphs, bbox=None):
 				rn = nx.DiGraph(edge_lst)
 				for node in rn.nodes():
 					rn.node[node]['subgraph'] = sg_idx
+				SGs.append(rn)
+	return SGs, (max_lon, min_lon, max_lat, min_lat)
+
+
+def generate_trajectory_graphs_v1(trajectories_path, n_subgraphs, bbox=None):
+	"""
+
+	:param trajectories_path:
+	:param bbox:
+	:param n_subgraphs:
+	:return: list of subgraphs corresponding to traces, bbox of the traces considered.
+	"""
+	max_lon, min_lon, max_lat, min_lat = float("-inf"), float("inf"), float("-inf"), float("inf")
+	SGs = []
+	node_dict = {}
+	node_cnt = -1
+	node_coordinates = {}
+	for sg_idx, fname in enumerate(os.listdir(trajectories_path)[:n_subgraphs]):
+		print fname
+		with open(os.path.join(trajectories_path, fname)) as f:
+			edge_lst = []
+			node_dict = {}
+			node_cnt = -1
+			node_coordinates = {}
+			lines = f.readlines()
+			for i in range(len(lines) - 1):
+				sx = map(float, lines[i].split(','))
+				tx = map(float, lines[i+1].split(','))
+				# extract lon, lat
+				s = (sx[2], sx[1])
+				t = (tx[2], tx[1])
+
+				# create node ids:
+				if s not in node_dict:
+					node_cnt += 1
+					node_dict[s] = node_cnt
+					node_coordinates[node_cnt] = s
+				if t not in node_dict:
+					node_cnt += 1
+					node_dict[t] = node_cnt
+					node_coordinates[node_cnt] = t
+				s_id = node_dict[s]
+				t_id = node_dict[t]
+
+
+				# extract node as (lon, lat)
+
+				edge_lst.append((s_id, t_id))
+
+				# update bbox:
+				if max_lon < s[0]: max_lon = s[0]
+				if min_lon > s[0]: min_lon = s[0]
+				if max_lat < s[1]: max_lat = s[1]
+				if min_lat > s[1]: min_lat = s[1]
+				if max_lon < t[0]: max_lon = t[0]
+				if min_lon > t[0]: min_lon = t[0]
+				if max_lat < t[1]: max_lat = t[1]
+				if min_lat > t[1]: min_lat = t[1]
+
+			if len(edge_lst) > 0:
+				rn = nx.DiGraph(edge_lst)
+				for node in rn.nodes():
+					rn.node[node] = {'subgraph': sg_idx, 'coordinates': node_coordinates[node]}
 				SGs.append(rn)
 	return SGs, (max_lon, min_lon, max_lat, min_lat)
 
@@ -72,7 +136,8 @@ def draw_subgraphs(SGs, bbox, showNodes=False):
 if __name__ == '__main__':
 	# sGs_, G_ = generate_graphs(20, 2, 10, 1, 3)
 	# draw_graphs([G_]+sGs_)
-	traj_path = '/home/sofiane/projects/data/GPS_Dataprivatebus_trips_20s_sample/'
+	# traj_path = '/home/sofiane/projects/data/GPS_Dataprivatebus_trips_20s_sample/'
+	traj_path = '/home/sofiane/trips_sample/'
 	SGs, actual_bbox = generate_trajectory_graphs(trajectories_path=traj_path, n_subgraphs=20)
 	for node in SGs[0].nodes():
 		print node, SGs[0].node[node]['subgraph']
